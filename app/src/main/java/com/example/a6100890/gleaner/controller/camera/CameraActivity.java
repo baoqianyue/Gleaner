@@ -102,8 +102,7 @@ public class CameraActivity extends AppCompatActivity {
             }
         });
         setCameraDisplayOrientation(this, mCameraId, mCamera);
-
-        //initTensorFlowAndLoadModel();
+        initTensorFlowAndLoadModel();
 
 
     }
@@ -138,7 +137,6 @@ public class CameraActivity extends AppCompatActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return c;
     }
 
@@ -196,7 +194,7 @@ public class CameraActivity extends AppCompatActivity {
                         }
                     }
                 };
-                timer.schedule(mTimerTask, 300, 300);
+                timer.schedule(mTimerTask, 100, 100);
 
             }
             new Thread(new Runnable() {
