@@ -1,8 +1,8 @@
 package com.example.a6100890.gleaner.controller.camera;
-
 import com.example.a6100890.gleaner.R;
 import com.example.a6100890.gleaner.controller.tensorflow.Classifier;
 import com.example.a6100890.gleaner.controller.tensorflow.TensorFlowImageClassifier;
+
 
 import android.app.Activity;
 import android.content.Context;
@@ -12,11 +12,16 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.os.Environment;
+
+
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.hardware.*;
 import android.hardware.Camera.*;
 import android.util.Log;
+
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
@@ -26,11 +31,14 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+
+
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -41,10 +49,7 @@ import java.util.concurrent.Executors;
 public class CameraActivity extends AppCompatActivity {
 
     private String mPicturePath;
-
     private String mPictureResult = null;
-
-
     private static final String TAG = "CameraActivity";
     private Camera mCamera;
     private CameraPreview mPreview;
@@ -57,20 +62,19 @@ public class CameraActivity extends AppCompatActivity {
     private static final float IMAGE_STD = 1;
     private static final String INPUT_NAME = "input";
     private static final String OUTPUT_NAME = "output";
-    private static int[] results = new int[2];
+    //private static int[] results = new int[2];
 
     private FrameLayout mCoverFrameLayout;
     private Timer timer = new Timer();
     private TimerTask mTimerTask = null;
-    private static final int MSG_WHAT_TIME_IS_UP = 1;//时间到了
-    private static final int MSG_WHAT_TIME_IS_TICK = 2;//时间减少中
+    //private static final int MSG_WHAT_TIME_IS_UP = 1;//时间到了
+    //private static final int MSG_WHAT_TIME_IS_TICK = 2;//时间减少中
     private int mTimeCount = 0;
     private Classifier mClassifier;
 
     private static final String MODEL_FILE = "file:///android_asset/tensorflow_inception_graph.pb";
     private static final String LABEL_FILE =
             "file:///android_asset/imagenet_comp_graph_label_strings.txt";
-
 
     private Executor mExecutor = Executors.newSingleThreadExecutor();
 
@@ -88,12 +92,12 @@ public class CameraActivity extends AppCompatActivity {
         //注意：上面两个设置必须写在setContentView前面
         setContentView(R.layout.camera_activity_layout);
 
-
         if (!checkCameraHardware(this)) {
             Toast.makeText(CameraActivity.this, "相机不支持", Toast.LENGTH_SHORT).show();
         } else {
             openCamera();
         }
+
         mTakePictureButton = (ImageView) findViewById(R.id.button_capture);
         mTakePictureButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -345,6 +349,7 @@ public class CameraActivity extends AppCompatActivity {
         Intent mIntent = new Intent();
         mIntent.putExtra("result", mPictureResult);
         CameraActivity.this.setResult(0,mIntent);
+        releaseCamera();
         finish();
     }
 }
