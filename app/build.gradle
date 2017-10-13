@@ -49,4 +49,5 @@ dependencies {
     compile 'cn.bmob.android:bmob-sms:1.0.1'
     compile 'cn.bmob.android:http-legacy:1.0'
     testCompile 'junit:junit:4.12'
+    compile 'com.flurgle:camerakit:0.9.13'
 }
