@@ -185,22 +185,6 @@ public class CameraActivity extends AppCompatActivity {
             Log.d(TAG, mPicturePath);
             mCoverFrameLayout.setVisibility(View.VISIBLE);
 
-            if (mTimerTask == null) {
-                mTimeCount = 3;
-                mTimerTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        mTimeCount--;
-
-                        if (mTimeCount <= 0) {   //时间到了就弹出对话框
-
-                            stopTimer();
-                        }
-                    }
-                };
-                timer.schedule(mTimerTask, 100, 100);
-
-            }
             new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -210,16 +194,21 @@ public class CameraActivity extends AppCompatActivity {
                         bitmap = rotateBitmapByDegree(bitmap, 90);
                         //缩放
                         bitmap = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, false);
-                        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
+
                         final List<Classifier.Recognition> results = mClassifier.recognizeImage(bitmap);
+                        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
                         mPictureResult = results.toString();
                         Log.d(TAG, "run: " + mPictureResult);
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos);
                         bos.flush();
                         bos.close();
                         bitmap.recycle();
-
-
+                        Intent mIntent = new Intent();
+                        mIntent.putExtra("result", mPictureResult);
+                        CameraActivity.this.setResult(0,mIntent);
+                        releaseCamera();
+                        Log.d(TAG, "stopTimer: ");
+                        finish();
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     } catch (IOException e) {
@@ -342,15 +331,9 @@ public class CameraActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         Log.d(TAG, "onStop: ");
+        mClassifier.close();
 
     }
 
-    private void stopTimer() {
-        Intent mIntent = new Intent();
-        mIntent.putExtra("result", mPictureResult);
-        CameraActivity.this.setResult(0,mIntent);
-        releaseCamera();
-        finish();
-    }
 }
 

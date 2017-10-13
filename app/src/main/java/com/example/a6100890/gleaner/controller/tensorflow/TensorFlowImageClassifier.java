@@ -79,8 +79,10 @@ public class TensorFlowImageClassifier implements Classifier {
         c.inputName = inputName;
         c.outputName = outputName;
 
-        String actualFilename = labelFilename.split("file:///android_asset/")[1];
 
+
+        String actualFilename = labelFilename.split("file:///android_asset/")[1];
+        Log.i(TAG, "Reading labels from: " + actualFilename);
         BufferedReader br = null;
         br = new BufferedReader(new InputStreamReader(assetManager.open(actualFilename)));
         String line;
@@ -95,19 +97,19 @@ public class TensorFlowImageClassifier implements Classifier {
         }
 
         int numClasses =
-                (int) c.inferenceInterface.graph().operation(outputName).output(0).shape().size(0);
-
+                (int) c.inferenceInterface.graph().operation(outputName).output(0).shape().size(1);
+        Log.i(TAG, "Read " + c.labels.size() + " labels, output layer size is " + numClasses);
 
 
         c.inputSize = inputSize;
         c.imageMean = imageMean;
         c.imageStd = imageStd;
 
+
         c.outputNames = new String[]{outputName};
         c.intValues = new int[inputSize * inputSize];
         c.floatValues = new float[inputSize * inputSize * 3];
         c.outputs = new float[numClasses];
-        //inputsize = 224
 
         return c;
     }
@@ -118,46 +120,38 @@ public class TensorFlowImageClassifier implements Classifier {
         Trace.beginSection("recognizeImage");
 
         Trace.beginSection("preprocessBitmap");
-
-        //getPixels()函数把一张图片，从指定的偏移位置（offset），指定的位置（x,y）截取指定的宽高（width,height ），
-        // 把所得图像的每个像素颜色转为int值，存入pixels。
-        //stride 参数指定在行之间跳过的像素的数目。图片是二维的，存入一个一维数组中，那么就需要这个参数来指定多少个像素换一行。
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
-
         for (int i = 0; i < intValues.length; ++i) {
             final int val = intValues[i];
             floatValues[i * 3 + 0] = (((val >> 16) & 0xFF) - imageMean) / imageStd;
             floatValues[i * 3 + 1] = (((val >> 8) & 0xFF) - imageMean) / imageStd;
             floatValues[i * 3 + 2] = ((val & 0xFF) - imageMean) / imageStd;
-           // Log.d(TAG, "getResult1: " + floatValues[i * 3 + 0] + "   " + floatValues[i * 3 + 1] + "   " + floatValues[i * 3 + 2] + "   ");
         }
         Trace.endSection();
 
-        // input.
+
         Trace.beginSection("fillNodeFloat");
         inferenceInterface.fillNodeFloat(
                 inputName, new int[]{1, inputSize, inputSize, 3}, floatValues);
         Trace.endSection();
 
-        // 识别操作
+
         Trace.beginSection("runInference");
         inferenceInterface.runInference(outputNames);
         Trace.endSection();
 
-        //将输出的tensor放到数组
+
         Trace.beginSection("readNodeFloat");
         inferenceInterface.readNodeFloat(outputName, outputs);
         Trace.endSection();
 
-        // 使用PriorityQueue来遍历label寻找最好的标签
-        //Comparator是在集合外部实现的排序
+
         PriorityQueue<Recognition> pq =
                 new PriorityQueue<Recognition>(
                         3,
                         new Comparator<Recognition>() {
                             @Override
                             public int compare(Recognition lhs, Recognition rhs) {
-                                // 将可能性最高的放在开头
                                 return Float.compare(rhs.getConfidence(), lhs.getConfidence());
                             }
                         });
@@ -173,6 +167,7 @@ public class TensorFlowImageClassifier implements Classifier {
         for (int i = 0; i < recognitionsSize; ++i) {
             recognitions.add(pq.poll());
         }
+        Trace.endSection();
         return recognitions;
     }
 

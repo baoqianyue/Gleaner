@@ -66,10 +66,10 @@ public interface Classifier {
             if (title != null) {
                 resultString += title + " ";
             }
-
+            /*
             if (confidence != null) {
                 resultString += String.format("(%.1f%%) ", confidence * 100.0f);
-            }
+            }*/
 
             if (location != null) {
                 resultString += location + " ";
