@@ -197,7 +197,7 @@ public class CameraActivity extends AppCompatActivity {
 
                         final List<Classifier.Recognition> results = mClassifier.recognizeImage(bitmap);
                         BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
-                        mPictureResult = results.toString();
+                        mPictureResult = results.get(0).toString();
                         Log.d(TAG, "run: " + mPictureResult);
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos);
                         bos.flush();
