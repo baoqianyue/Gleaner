@@ -41,4 +41,5 @@ dependencies {
     //6.0兼容包
     compile 'cn.bmob.android:http-legacy:1.0'
     compile 'com.android.support:design:26.0.0-alpha1'
+    compile files('libs/hyphenatechat_3.3.4.jar')
 }
