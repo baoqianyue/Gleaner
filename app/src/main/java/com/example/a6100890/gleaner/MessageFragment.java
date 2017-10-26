@@ -57,6 +57,7 @@ public class MessageFragment extends Fragment {
 
         return view;
     }
+
     public static MessageFragment newInsatnce() {
         return new MessageFragment();
     }
@@ -69,6 +70,7 @@ public class MessageFragment extends Fragment {
 
     /**
      * 从chatManager中获取会话列表
+     *
      * @return
      */
     private List<EMConversation> loadConversationList() {
@@ -103,6 +105,7 @@ public class MessageFragment extends Fragment {
     /**
      * 根据最后一条消息的时间对conversation排序
      * 参数Pair用于关联EmConVersation 和 Long 时间
+     *
      * @param conversationList
      */
     private void sortConversationByLastChatTime(List<Pair<Long, EMConversation>> conversationList) {
@@ -203,8 +206,6 @@ public class MessageFragment extends Fragment {
 
 
     }
-
-
 
 
 }

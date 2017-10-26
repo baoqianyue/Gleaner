@@ -1,10 +1,12 @@
 package com.example.a6100890.gleaner;
 
 import android.app.ActivityManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.BottomNavigationView;
+import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -14,17 +16,29 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import com.example.a6100890.gleaner.communication.ChatActivity;
+import com.hyphenate.EMContactListener;
 import com.hyphenate.chat.EMClient;
 import com.hyphenate.chat.EMOptions;
+import com.hyphenate.easeui.EaseConstant;
+import com.hyphenate.easeui.EaseUI;
+import com.hyphenate.easeui.domain.EaseUser;
+import com.hyphenate.easeui.ui.EaseContactListFragment;
+import com.hyphenate.easeui.ui.EaseConversationListFragment;
+import com.hyphenate.exceptions.HyphenateException;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 public class BaseActivity extends AppCompatActivity implements BottomNavigationView.OnNavigationItemSelectedListener {
     private BottomNavigationView mBottomNavigationView;
     private ViewPager mViewPager;
     private MenuItem mMenuItem;
     private Toolbar mToolbar;
+    private Boolean isLogin = false;
+    private EaseContactListFragment mEaseContactListFragment;
 
     private static final String TAG = "BsaeActivity";
 
@@ -34,10 +48,19 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_base);
 
+        if (getIntent() != null) {
+            isLogin = getIntent().getBooleanExtra("isLogin", false);
+            Log.d(TAG, "onCreate: getintent"+isLogin);
+        }
+
+        if (!isLogin) {
+            Intent loginIntent = new Intent(this, LoginActivity.class);
+            startActivity(loginIntent);
+        }
+
         //Bmob应用ID: e4623d0c00213bb18860e466c83b5791
 //        Bmob.initialize(this,"e4623d0c00213bb18860e466c83b5791");
         //环信 1129171011178759#gleaner
-
         initView();
         initEasemob();
     }
@@ -91,9 +114,11 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
 
     private void setupViewPager() {
         ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
+        mEaseContactListFragment = new EaseContactListFragment();
         adapter.addFragment(HomeFragment.newInstance());
         adapter.addFragment(LostListFragment.newInstance());
-        adapter.addFragment(MessageFragment.newInsatnce());
+        adapter.addFragment(mEaseContactListFragment);
+
         mViewPager.setAdapter(adapter);
     }
 
@@ -102,6 +127,7 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
      */
     private void initEasemob() {
         EMOptions options = new EMOptions();
+        EaseUI.getInstance().init(this, options);
 //        默认添加好友认证
 //        options.setAcceptInvitationAlways(false);
 
@@ -116,6 +142,58 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
             Log.d(TAG, "enter the service process!");
             return;
         }
+
+        //添加好友监听
+        EMClient.getInstance().contactManager().setContactListener(new EMContactListener() {
+            @Override
+            public void onContactAdded(final String s) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.d(TAG, "onContactAdded " + s);
+                        mEaseContactListFragment.setContactsMap(getContacts());
+                        mEaseContactListFragment.refresh();
+                    }
+                }).start();
+            }
+
+            @Override
+            public void onContactDeleted(String s) {
+
+            }
+
+            @Override
+            public void onContactInvited(String s, String s1) {
+
+            }
+
+            @Override
+            public void onFriendRequestAccepted(String s) {
+
+            }
+
+            @Override
+            public void onFriendRequestDeclined(String s) {
+
+            }
+        });
+
+        //联系人列表设置联系人
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mEaseContactListFragment.setContactsMap(getContacts());
+            }
+        }).start();
+
+        //为了解决easeui包中的EaseContactListFragment无法关联到Gleaner,所以在这里设置点击联系人的监听
+        //在优化包时可以考虑吧EaseContactListFragment放在Gleaner内,把此方法放到EaseContactListFragment中
+        mEaseContactListFragment.setContactListItemClickListener(new EaseContactListFragment.EaseContactListItemClickListener() {
+            @Override
+            public void onListItemClicked(EaseUser user) {
+                startActivity(new Intent(BaseActivity.this, ChatActivity.class).putExtra(EaseConstant.EXTRA_USER_ID, user.getUsername()));
+            }
+        });
     }
 
     /**
@@ -145,6 +223,23 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
         }
         return processName;
     }
+
+    private Map<String, EaseUser> getContacts() {
+        Map<String, EaseUser> map = new HashMap<>();
+        try {
+            List<String> userNames = EMClient.getInstance().contactManager().getAllContactsFromServer();
+            for (String userId : userNames) {
+                map.put(userId, new EaseUser(userId));
+            }
+        } catch (HyphenateException e) {
+            e.printStackTrace();
+        }
+
+        return map;
+    }
+
+
+
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {

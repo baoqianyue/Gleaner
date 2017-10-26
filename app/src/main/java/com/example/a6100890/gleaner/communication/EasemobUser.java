@@ -78,7 +78,7 @@ public class EasemobUser {
 
                     @Override
                     public void onError(int i, String s) {
-                        Log.d(TAG, "onError: login failed!" + s);
+                        Log.d(TAG, "onError: login_edit failed!" + s);
                     }
 
                     @Override
