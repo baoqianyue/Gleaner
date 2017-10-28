@@ -27,7 +27,7 @@ import com.hyphenate.util.EMLog;
 
 @SuppressLint("Registered")
 public class CallActivity extends EaseBaseActivity {
-    public final static String TAG = "CallActivity";
+    public final static String TAG = "VoiceCallActivity";
     protected final int MSG_CALL_MAKE_VIDEO = 0;
     protected final int MSG_CALL_MAKE_VOICE = 1;
     protected final int MSG_CALL_ANSWER = 2;

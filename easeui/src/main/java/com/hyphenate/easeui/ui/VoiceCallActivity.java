@@ -65,6 +65,7 @@ public class VoiceCallActivity extends CallActivity implements OnClickListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate: ");
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             finish();
@@ -150,6 +151,7 @@ public class VoiceCallActivity extends CallActivity implements OnClickListener {
                             @Override
                             public void run() {
                                 callStateTextView.setText(st1);
+                                Log.d(TAG, "onCallStateChanged : connecting");
                             }
                         });
                         break;
@@ -158,8 +160,10 @@ public class VoiceCallActivity extends CallActivity implements OnClickListener {
 
                             @Override
                             public void run() {
-                                String st3 = "已经和对方建立联系";
+                                String st3 = "等待对方响应...";
                                 callStateTextView.setText(st3);
+                                Log.d(TAG, "onCallStateChanged : connected");
+
                             }
                         });
                         break;
@@ -188,6 +192,8 @@ public class VoiceCallActivity extends CallActivity implements OnClickListener {
                                 callStateTextView.setText(str4);
                                 callingState = CallingState.NORMAL;
                                 startMonitor();
+                                Log.d(TAG, "onCallStateChanged : accepted");
+
                             }
                         });
                         break;
@@ -230,13 +236,12 @@ public class VoiceCallActivity extends CallActivity implements OnClickListener {
                         runOnUiThread(new Runnable() {
                             private void postDelayedCloseMsg() {
                                 handler.postDelayed(new Runnable() {
-
                                     @Override
                                     public void run() {
                                         runOnUiThread(new Runnable() {
                                             @Override
                                             public void run() {
-                                                Log.d("AAA", "CALL DISCONNETED");
+                                                Log.d(TAG, "CALL DISCONNETED");
                                                 removeCallStateListener();
                                                 saveCallRecord();
                                                 Animation animation = new AlphaAnimation(1.0f, 0.0f);
