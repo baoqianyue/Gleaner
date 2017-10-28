@@ -1,26 +1,24 @@
 package com.example.a6100890.gleaner;
 
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-
 import com.hyphenate.EMCallBack;
 import com.hyphenate.chat.EMClient;
-import com.hyphenate.easeui.domain.EaseUser;
 import com.hyphenate.exceptions.HyphenateException;
 
-public class LoginActivity extends AppCompatActivity implements View.OnClickListener{
+public class LoginActivity extends AppCompatActivity implements View.OnClickListener {
     private EditText mEditUsername;
     private EditText mEditPassword;
     private Button mButtonLogin;
     private Boolean isLogin = false;
-    String username;
-    String password;
+    String username = "xiaobing";
+    String password = "123456";
 
     private static final String TAG = "LoginActivity";
 
@@ -28,7 +26,6 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
-
 
 
         initView();
@@ -41,8 +38,6 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
         mButtonLogin.setOnClickListener(this);
     }
-
-
 
 
     private void register() {
@@ -77,7 +72,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
                     @Override
                     public void onError(int i, String s) {
-                        Log.d(TAG, "onError: login failed");
+                        Log.d(TAG, "onError: login failed :" + s);
                     }
 
                     @Override

@@ -1,13 +1,15 @@
 package com.example.a6100890.gleaner.communication;
 
 import android.support.v4.app.FragmentActivity;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.Window;
 
 import com.example.a6100890.gleaner.R;
 import com.hyphenate.easeui.ui.EaseChatFragment;
 
+/**
+ * 聊天界面
+ */
 public class ChatActivity extends FragmentActivity {
 
     @Override

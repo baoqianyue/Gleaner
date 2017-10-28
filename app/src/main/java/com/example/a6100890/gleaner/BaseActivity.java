@@ -2,19 +2,17 @@ package com.example.a6100890.gleaner;
 
 import android.app.ActivityManager;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.BottomNavigationView;
-import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Toast;
 
 import com.example.a6100890.gleaner.communication.ChatActivity;
 import com.hyphenate.EMContactListener;
@@ -23,8 +21,8 @@ import com.hyphenate.chat.EMOptions;
 import com.hyphenate.easeui.EaseConstant;
 import com.hyphenate.easeui.EaseUI;
 import com.hyphenate.easeui.domain.EaseUser;
+import com.hyphenate.easeui.model.CallReceiver;
 import com.hyphenate.easeui.ui.EaseContactListFragment;
-import com.hyphenate.easeui.ui.EaseConversationListFragment;
 import com.hyphenate.exceptions.HyphenateException;
 
 import java.util.HashMap;
@@ -178,6 +176,7 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
             }
         });
 
+
         //联系人列表设置联系人
         new Thread(new Runnable() {
             @Override
@@ -194,6 +193,12 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
                 startActivity(new Intent(BaseActivity.this, ChatActivity.class).putExtra(EaseConstant.EXTRA_USER_ID, user.getUsername()));
             }
         });
+
+
+        //注册call广播监听
+        IntentFilter callFilter = new IntentFilter(EMClient.getInstance().callManager().getIncomingCallBroadcastAction());
+        registerReceiver(new CallReceiver(), callFilter);
+
     }
 
     /**
