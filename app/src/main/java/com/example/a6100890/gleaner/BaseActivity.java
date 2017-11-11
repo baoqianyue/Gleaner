@@ -30,6 +30,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import cn.bmob.v3.Bmob;
+
 public class BaseActivity extends AppCompatActivity implements BottomNavigationView.OnNavigationItemSelectedListener {
     private BottomNavigationView mBottomNavigationView;
     private ViewPager mViewPager;
@@ -37,6 +39,8 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
     private Toolbar mToolbar;
     private Boolean isLogin = false;
     private EaseContactListFragment mEaseContactListFragment;
+
+    private CallReceiver mCallReceiver;
 
     private static final String TAG = "BsaeActivity";
 
@@ -57,7 +61,7 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
         }
 
         //Bmob应用ID: e4623d0c00213bb18860e466c83b5791
-//        Bmob.initialize(this,"e4623d0c00213bb18860e466c83b5791");
+        Bmob.initialize(this,"e4623d0c00213bb18860e466c83b5791");
         //环信 1129171011178759#gleaner
         initView();
         initEasemob();
@@ -70,6 +74,13 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
         return true;
     }
 
+
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(mCallReceiver);
+        super.onDestroy();
+    }
 
     private void initView() {
         mBottomNavigationView = (BottomNavigationView) findViewById(R.id.bottom_nav);
@@ -196,8 +207,10 @@ public class BaseActivity extends AppCompatActivity implements BottomNavigationV
 
 
         //注册call广播监听
+        //测试:是否在这里重复监听广播
         IntentFilter callFilter = new IntentFilter(EMClient.getInstance().callManager().getIncomingCallBroadcastAction());
-        registerReceiver(new CallReceiver(), callFilter);
+        mCallReceiver = new CallReceiver();
+        registerReceiver(mCallReceiver, callFilter);
 
     }
 

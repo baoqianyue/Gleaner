@@ -34,12 +34,9 @@ dependencies {
     compile project(':easeui')
     compile 'com.android.support:appcompat-v7:26.+'
     compile 'com.android.support.constraint:constraint-layout:1.0.2'
-    compile 'com.squareup.okhttp:okhttp:2.0.0'
     compile 'com.google.code.gson:gson:2.2.4'
     compile 'com.android.support:recyclerview-v7:26.0.0-alpha1'
     compile 'cn.bmob.android:bmob-sdk:3.5.5'
-    compile 'cn.bmob.android:bmob-push:0.8'
-    compile 'cn.bmob.android:bmob-sms:1.0.1'
     compile 'cn.bmob.android:http-legacy:1.0'
     compile 'com.android.support:design:26.0.0-alpha1'
     testCompile 'junit:junit:4.12'

@@ -1,5 +1,7 @@
 package com.example.a6100890.gleaner;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -17,19 +19,15 @@ import android.widget.Button;
 import com.example.a6100890.gleaner.imageRecognition.ImageBody;
 import com.example.a6100890.gleaner.imageRecognition.Tags;
 import com.google.gson.Gson;
-import com.squareup.okhttp.MediaType;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.RequestBody;
-import com.squareup.okhttp.Response;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.MessageDigest;
@@ -40,11 +38,16 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import Decoder.BASE64Encoder;
+import cn.bmob.v3.datatype.BmobFile;
+import cn.bmob.v3.exception.BmobException;
+import cn.bmob.v3.listener.UploadFileListener;
 
 
 /**
@@ -53,18 +56,20 @@ import Decoder.BASE64Encoder;
 
 public class HomeFragment extends Fragment implements View.OnClickListener {
     public static final int TAKE_PHOTO = 1;
-    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final String TAG = "HomeFragment";
 
 
     private Button mBtnCameraRelease;
     private Uri mImageUri;
-    private String returnJson;
     private List<Tags> mImageTags = new ArrayList<>();
+    private File mOutputImage;
+    private String mImageUrl;
+    private Lock mUrlLock;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mUrlLock = new ReentrantLock();
     }
 
     @Nullable
@@ -88,7 +93,9 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btn_camara_release:
-                selectPicFromCamera();
+//                selectPicFromCamera();
+
+                recognitionImage("/storage/emulated/0/1/sina/nike.jpg");
                 break;
 
             default:
@@ -98,21 +105,25 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     }
 
     private void selectPicFromCamera() {
-        File outputImage = new File(getActivity().getExternalCacheDir(), "output_image.jpg");
         try {
-            if (outputImage.exists()) {
-                outputImage.delete();
+            if (mOutputImage == null) {
+                mOutputImage = new File(getActivity().getExternalFilesDir("image"), "output_image.jpg");
             }
-            outputImage.createNewFile();
+
+            if (mOutputImage.exists()) {
+                mOutputImage.delete();
+            }
+            mOutputImage.createNewFile();
+
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         //将File转换为Uri
         if (Build.VERSION.SDK_INT >= 24) {
-            mImageUri = FileProvider.getUriForFile(getActivity(), "com.example.a6100890.gleaner.fileprovider", outputImage);
+            mImageUri = FileProvider.getUriForFile(getActivity(), "com.example.a6100890.gleaner.fileprovider", mOutputImage);
         } else {
-            mImageUri = Uri.fromFile(outputImage);
+            mImageUri = Uri.fromFile(mOutputImage);
         }
 
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -125,7 +136,13 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         switch (requestCode) {
             case TAKE_PHOTO:
                 if (resultCode == getActivity().RESULT_OK) {
+                    if (mOutputImage.exists()) {
+//                        String imageContent = GetImageStrFromPath(mOutputImage.getPath());
+//                        Log.d(TAG, "onActivityResult: " + imageContent);
+                        String imagePath = mOutputImage.getPath();
+                        Log.d(TAG, "onActivityResult: " + mOutputImage.length());
 
+                    }
                 }
                 break;
             default:
@@ -136,12 +153,14 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     /**
      * 一定要开启一个线程来执行网络协议
      */
-    private void recognitionImage(final String imageUrl) {
+    private void recognitionImage(final String imagePath) {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                uploadFile(imagePath);
+
                 String postUrl = "https://dtplus-cn-shanghai.data.aliyuncs.com/image/tag";
-                String body = constructJson(imageUrl);
+                String body = constructJson(mImageUrl);
 
                 try {
                     String result = sendPost(postUrl, body);
@@ -192,13 +211,10 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
                     Log.d(TAG, "paresJson: " + tag.getValue() + " " + tag.getConfidence());
                 }
             }
-
-
         } else {
             Log.d(TAG, "paresJson: json is null!");
         }
     }
-
 
     public static String toGMTString(Date date) {
         SimpleDateFormat df = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z", Locale.UK);
@@ -239,7 +255,28 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         return result;
     }
 
-//    public static String GetImageStrFromPath(String )
+    /**
+     * 对图像进行base64编码
+     */
+    public static String GetImageStrFromPath(String imgPath) {
+        InputStream in = null;
+        byte[] data = null;
+
+        //读取图片字节数组
+        try {
+            in = new FileInputStream(imgPath);
+            data = new byte[in.available()];
+            in.read(data);
+            in.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        //对字节数组Base64编码
+        BASE64Encoder encoder = new BASE64Encoder();
+        return encoder.encode(data);
+    }
 
     /*
      * 发送POST请求
@@ -292,9 +329,9 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             out.flush();
 
             // 定义BufferedReader输入流来读取URL的响应
-            statusCode = ((HttpURLConnection)conn).getResponseCode();
-            if(statusCode != 200) {
-                in = new BufferedReader(new InputStreamReader(((HttpURLConnection)conn).getErrorStream()));
+            statusCode = ((HttpURLConnection) conn).getResponseCode();
+            if (statusCode != 200) {
+                in = new BufferedReader(new InputStreamReader(((HttpURLConnection) conn).getErrorStream()));
             } else {
                 in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             }
@@ -318,9 +355,34 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         }
 
         if (statusCode != 200) {
-            throw new IOException("\nHttp StatusCode: "+ statusCode + "\nErrorMessage: " + result);
+            throw new IOException("\nHttp StatusCode: " + statusCode + "\nErrorMessage: " + result);
         }
         return result;
+    }
+
+
+    private void uploadFile(final String filePath) {
+        try {
+            Log.d(TAG, "uploadFile: here1 :" + Thread.currentThread());
+
+            final BmobFile bmobFile = new BmobFile(new File(filePath));
+            bmobFile.uploadblock(new UploadFileListener() {
+                @Override
+                public void done(BmobException e) {
+                    if (e == null) {
+                        mImageUrl = bmobFile.getFileUrl();
+                        Log.d(TAG, "uploadFile succeed: " + mImageUrl);
+
+                        Log.d(TAG, "uploadFile: here2 :" + Thread.currentThread());
+                    } else {
+                        Log.d(TAG, "uploadFile failed: " + e.getMessage());
+                        mImageUrl = "";
+                    }
+                }
+            });
+        } catch (NoSuchMethodError e) {
+            e.printStackTrace();
+        }
     }
 
 }
