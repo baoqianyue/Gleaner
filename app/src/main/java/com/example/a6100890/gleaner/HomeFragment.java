@@ -1,11 +1,17 @@
 package com.example.a6100890.gleaner;
 
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
@@ -23,6 +29,7 @@ import com.google.gson.Gson;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -58,18 +65,18 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     public static final int TAKE_PHOTO = 1;
     private static final String TAG = "HomeFragment";
 
-
     private Button mBtnCameraRelease;
     private Uri mImageUri;
     private List<Tags> mImageTags = new ArrayList<>();
     private File mOutputImage;
     private String mImageUrl;
-    private Lock mUrlLock;
+    private String strImgPath;
+    private UploadTask mUploadTask;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mUrlLock = new ReentrantLock();
+        mUploadTask = new UploadTask();
     }
 
     @Nullable
@@ -93,9 +100,9 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btn_camara_release:
+                String filePath = "/storage/emulated/0/1/sina/nike.jpg";
 //                selectPicFromCamera();
-
-                recognitionImage("/storage/emulated/0/1/sina/nike.jpg");
+                openCamera();
                 break;
 
             default:
@@ -106,15 +113,12 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
 
     private void selectPicFromCamera() {
         try {
-            if (mOutputImage == null) {
-                mOutputImage = new File(getActivity().getExternalFilesDir("image"), "output_image.jpg");
-            }
+            File outputImage = new File(Environment.getExternalStorageDirectory(), "output_image.jpg");
 
-            if (mOutputImage.exists()) {
-                mOutputImage.delete();
+            if (outputImage.exists()) {
+                outputImage.delete();
             }
-            mOutputImage.createNewFile();
-
+            outputImage.createNewFile();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -130,19 +134,41 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageUri);
         startActivityForResult(intent, TAKE_PHOTO);
     }
+    
+    private void openCamera() {
+        Intent getPhoto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        strImgPath = Environment.getExternalStorageDirectory().toString() + "/image/";
+        String fileName = "output_image.jpg";
+        File out = new File(strImgPath);
+        
+        if (!out.exists()) {
+            out.mkdirs();
+        }
+        
+        out = new File(strImgPath, fileName);
+        strImgPath = strImgPath + fileName;
+        
+        Uri uri = Uri.fromFile(out);
+        getPhoto.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+        getPhoto.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
+        startActivityForResult(getPhoto, TAKE_PHOTO); 
+        
+        
+    }
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
             case TAKE_PHOTO:
                 if (resultCode == getActivity().RESULT_OK) {
-                    if (mOutputImage.exists()) {
-//                        String imageContent = GetImageStrFromPath(mOutputImage.getPath());
-//                        Log.d(TAG, "onActivityResult: " + imageContent);
-                        String imagePath = mOutputImage.getPath();
-                        Log.d(TAG, "onActivityResult: " + mOutputImage.length());
+                    mOutputImage = new File(strImgPath);
+                    Log.d(TAG, "onActivityResult: " + mOutputImage.length());
+                    Log.d(TAG, "onActivityResult: " + mOutputImage.getPath());
+                    Log.d(TAG, "onActivityResult: " + mOutputImage.getAbsolutePath());
+                    mUploadTask.execute(mOutputImage.getAbsolutePath());
 
-                    }
+                } else {
+                    Log.d(TAG, "onActivityResult: result != OK");
                 }
                 break;
             default:
@@ -153,14 +179,12 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     /**
      * 一定要开启一个线程来执行网络协议
      */
-    private void recognitionImage(final String imagePath) {
+    private void recognitionImage(final String imageUrl) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                uploadFile(imagePath);
-
                 String postUrl = "https://dtplus-cn-shanghai.data.aliyuncs.com/image/tag";
-                String body = constructJson(mImageUrl);
+                String body = constructJson(imageUrl);
 
                 try {
                     String result = sendPost(postUrl, body);
@@ -171,7 +195,6 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             }
         }).start();
     }
-
 
     /**
      * 在sendRequest中调用
@@ -360,29 +383,64 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         return result;
     }
 
-
-    private void uploadFile(final String filePath) {
-        try {
-            Log.d(TAG, "uploadFile: here1 :" + Thread.currentThread());
-
-            final BmobFile bmobFile = new BmobFile(new File(filePath));
-            bmobFile.uploadblock(new UploadFileListener() {
-                @Override
-                public void done(BmobException e) {
-                    if (e == null) {
-                        mImageUrl = bmobFile.getFileUrl();
-                        Log.d(TAG, "uploadFile succeed: " + mImageUrl);
-
-                        Log.d(TAG, "uploadFile: here2 :" + Thread.currentThread());
-                    } else {
-                        Log.d(TAG, "uploadFile failed: " + e.getMessage());
-                        mImageUrl = "";
+    public static String getRealFilePath( final Context context, final Uri uri ) {
+        if ( null == uri ) return null;
+        final String scheme = uri.getScheme();
+        String data = null;
+        if ( scheme == null )
+            data = uri.getPath();
+        else if ( ContentResolver.SCHEME_FILE.equals( scheme ) ) {
+            data = uri.getPath();
+        } else if ( ContentResolver.SCHEME_CONTENT.equals( scheme ) ) {
+            Cursor cursor = context.getContentResolver().query( uri, new String[] { MediaStore.Images.ImageColumns.DATA }, null, null, null );
+            if ( null != cursor ) {
+                if ( cursor.moveToFirst() ) {
+                    int index = cursor.getColumnIndex( MediaStore.Images.ImageColumns.DATA );
+                    if ( index > -1 ) {
+                        data = cursor.getString( index );
                     }
                 }
-            });
-        } catch (NoSuchMethodError e) {
-            e.printStackTrace();
+                cursor.close();
+            }
+        }
+        return data;
+    }
+
+    private class UploadTask extends AsyncTask<String, Integer, String> {
+        @Override
+        protected String doInBackground(String... filePaths) {
+            String filePath = filePaths[0];
+            final BmobFile bmobFile = new BmobFile(new File(filePath));
+            final String[] imageUrl = new String[1];
+
+            try {
+                bmobFile.uploadblock(new UploadFileListener() {
+                    @Override
+                    public void done(BmobException e) {
+                        if (e == null) {
+                            imageUrl[0] = bmobFile.getFileUrl();
+                            Log.d(TAG, "uploadFile succeed: " + imageUrl[0]);
+
+                            recognitionImage(imageUrl[0]);
+                        } else {
+                            Log.d(TAG, "uploadFile failed: " + e.getMessage());
+                            imageUrl[0] = "";
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            return imageUrl[0];
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+//            recognitionImage(s);
         }
     }
+
 
 }
