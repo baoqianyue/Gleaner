@@ -205,8 +205,6 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
      * @return
      */
     private String constructJson(String imageUrl) {
-//        PostJson postJson = new PostJson(imageUrl);
-//        String json = new Gson().toJson(postJson);
         String json = "{\"type\":0,\"image_url\":" + "\"" + imageUrl + "\"" + "}";
         Log.d(TAG, "constructJson: " + json);
         return json;
@@ -272,6 +270,26 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         } catch (Exception e) {
             throw new Error("Failed to generate HMAC : " + e.getMessage());
         }
+        return result;
+    }
+
+    public static String File2String(File imageFile) {
+        InputStream in = null;
+        byte[] data = null;
+
+        //读取图片字节数组
+        try {
+            in = new FileInputStream(imageFile);
+            data = new byte[in.available()];
+            in.read(data);
+            in.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        BASE64Encoder encoder = new BASE64Encoder();
+        String result = encoder.encode(data);
         return result;
     }
 
