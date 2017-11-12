@@ -21,6 +21,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import com.example.a6100890.gleaner.imageRecognition.ImageBody;
 import com.example.a6100890.gleaner.imageRecognition.Tags;
@@ -55,6 +57,7 @@ import Decoder.BASE64Encoder;
 import cn.bmob.v3.datatype.BmobFile;
 import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.UploadFileListener;
+import okhttp3.OkHttpClient;
 
 
 /**
@@ -69,14 +72,13 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     private Uri mImageUri;
     private List<Tags> mImageTags = new ArrayList<>();
     private File mOutputImage;
-    private String mImageUrl;
     private String strImgPath;
-    private UploadTask mUploadTask;
+    private ProgressBar mProgressBar;
+    private TextView mTextView;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mUploadTask = new UploadTask();
     }
 
     @Nullable
@@ -90,6 +92,8 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     private void initView(View view) {
         mBtnCameraRelease = view.findViewById(R.id.btn_camara_release);
         mBtnCameraRelease.setOnClickListener(this);
+        mProgressBar = view.findViewById(R.id.progress_bar);
+        mTextView = view.findViewById(R.id.text_view);
     }
 
     public static HomeFragment newInstance() {
@@ -134,26 +138,26 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageUri);
         startActivityForResult(intent, TAKE_PHOTO);
     }
-    
+
     private void openCamera() {
         Intent getPhoto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         strImgPath = Environment.getExternalStorageDirectory().toString() + "/image/";
         String fileName = "output_image.jpg";
         File out = new File(strImgPath);
-        
+
         if (!out.exists()) {
             out.mkdirs();
         }
-        
+
         out = new File(strImgPath, fileName);
         strImgPath = strImgPath + fileName;
-        
+
         Uri uri = Uri.fromFile(out);
         getPhoto.putExtra(MediaStore.EXTRA_OUTPUT, uri);
         getPhoto.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
-        startActivityForResult(getPhoto, TAKE_PHOTO); 
-        
-        
+        startActivityForResult(getPhoto, TAKE_PHOTO);
+
+
     }
 
     @Override
@@ -162,10 +166,8 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             case TAKE_PHOTO:
                 if (resultCode == getActivity().RESULT_OK) {
                     mOutputImage = new File(strImgPath);
-                    Log.d(TAG, "onActivityResult: " + mOutputImage.length());
-                    Log.d(TAG, "onActivityResult: " + mOutputImage.getPath());
-                    Log.d(TAG, "onActivityResult: " + mOutputImage.getAbsolutePath());
-                    mUploadTask.execute(mOutputImage.getAbsolutePath());
+//                    new UploadTask().execute(mOutputImage);
+                    recognizeImageFile(mOutputImage);
 
                 } else {
                     Log.d(TAG, "onActivityResult: result != OK");
@@ -185,16 +187,16 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             public void run() {
                 String postUrl = "https://dtplus-cn-shanghai.data.aliyuncs.com/image/tag";
                 String body = constructJson(imageUrl);
-
                 try {
                     String result = sendPost(postUrl, body);
-                    Log.d(TAG, "recognitionImage: " + result);
+                    Log.d(TAG, "recognitionImage: Thread: " + Thread.currentThread() + result);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }).start();
     }
+
 
     /**
      * 在sendRequest中调用
@@ -220,12 +222,7 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         Gson gson = new Gson();
         if (json != null) {
             mImageTags = gson.fromJson(json, ImageBody.class).getTags();
-            Collections.sort(mImageTags, new Comparator<Tags>() {
-                @Override
-                public int compare(Tags t1, Tags t2) {
-                    return t1.getConfidence() - t2.getConfidence();
-                }
-            });
+
 
             if (mImageTags.size() == 0) {
                 Log.d(TAG, "paresJson: something wrong: imageTags .size == 0");
@@ -276,29 +273,6 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             throw new Error("Failed to generate HMAC : " + e.getMessage());
         }
         return result;
-    }
-
-    /**
-     * 对图像进行base64编码
-     */
-    public static String GetImageStrFromPath(String imgPath) {
-        InputStream in = null;
-        byte[] data = null;
-
-        //读取图片字节数组
-        try {
-            in = new FileInputStream(imgPath);
-            data = new byte[in.available()];
-            in.read(data);
-            in.close();
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        //对字节数组Base64编码
-        BASE64Encoder encoder = new BASE64Encoder();
-        return encoder.encode(data);
     }
 
     /*
@@ -383,63 +357,34 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         return result;
     }
 
-    public static String getRealFilePath( final Context context, final Uri uri ) {
-        if ( null == uri ) return null;
-        final String scheme = uri.getScheme();
-        String data = null;
-        if ( scheme == null )
-            data = uri.getPath();
-        else if ( ContentResolver.SCHEME_FILE.equals( scheme ) ) {
-            data = uri.getPath();
-        } else if ( ContentResolver.SCHEME_CONTENT.equals( scheme ) ) {
-            Cursor cursor = context.getContentResolver().query( uri, new String[] { MediaStore.Images.ImageColumns.DATA }, null, null, null );
-            if ( null != cursor ) {
-                if ( cursor.moveToFirst() ) {
-                    int index = cursor.getColumnIndex( MediaStore.Images.ImageColumns.DATA );
-                    if ( index > -1 ) {
-                        data = cursor.getString( index );
-                    }
+    private String recognizeImageFile(File file) {
+        final BmobFile bmobFile = new BmobFile(file);
+        final String[] imageUrl = new String[1];
+
+        bmobFile.uploadblock(new UploadFileListener() {
+            @Override
+            public void done(BmobException e) {
+                mProgressBar.setVisibility(View.GONE);
+                if (e == null) {
+                    imageUrl[0] = bmobFile.getFileUrl();
+                    recognitionImage(imageUrl[0]);
+
+                } else {
+                    Log.d(TAG, "uploadFile failed: " + e.getMessage());
+                    imageUrl[0] = "";
                 }
-                cursor.close();
-            }
-        }
-        return data;
-    }
-
-    private class UploadTask extends AsyncTask<String, Integer, String> {
-        @Override
-        protected String doInBackground(String... filePaths) {
-            String filePath = filePaths[0];
-            final BmobFile bmobFile = new BmobFile(new File(filePath));
-            final String[] imageUrl = new String[1];
-
-            try {
-                bmobFile.uploadblock(new UploadFileListener() {
-                    @Override
-                    public void done(BmobException e) {
-                        if (e == null) {
-                            imageUrl[0] = bmobFile.getFileUrl();
-                            Log.d(TAG, "uploadFile succeed: " + imageUrl[0]);
-
-                            recognitionImage(imageUrl[0]);
-                        } else {
-                            Log.d(TAG, "uploadFile failed: " + e.getMessage());
-                            imageUrl[0] = "";
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
             }
 
-            return imageUrl[0];
-        }
+            @Override
+            public void onProgress(Integer value) {
+                super.onProgress(value);
+                mProgressBar.setVisibility(View.VISIBLE);
+                mProgressBar.setProgress(value);
+                mTextView.setText("正在识别...");
+            }
+        });
 
-        @Override
-        protected void onPostExecute(String s) {
-            super.onPostExecute(s);
-//            recognitionImage(s);
-        }
+        return imageUrl[0];
     }
 
 
