@@ -1,15 +1,9 @@
 package com.example.a6100890.gleaner;
 
-import android.app.Activity;
-import android.content.ContentResolver;
-import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Camera;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -27,13 +21,14 @@ import android.widget.TextView;
 
 import com.example.a6100890.gleaner.imageRecognition.ImageBody;
 import com.example.a6100890.gleaner.imageRecognition.Tags;
-import com.example.a6100890.gleaner.imageRecognition.takePhoto.CameraActivity;
 import com.google.gson.Gson;
 
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -44,13 +39,9 @@ import java.net.URLConnection;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -59,7 +50,6 @@ import Decoder.BASE64Encoder;
 import cn.bmob.v3.datatype.BmobFile;
 import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.UploadFileListener;
-import okhttp3.OkHttpClient;
 
 
 /**
@@ -109,8 +99,9 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
                 String filePath = "/storage/emulated/0/1/sina/nike.jpg";
 //                openCamera();
 
-                Intent intent = new Intent(getActivity(), CameraActivity.class);
-                startActivity(intent);
+                openCamera();
+//                Intent intent = new Intent(getActivity(), CameraActivity.class);
+//                startActivity(intent);
                 break;
 
             default:
@@ -119,7 +110,10 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
 
     }
 
-    private void openCamera() {
+    /**
+     * 自己构建的File形式,暂时弃用
+     */
+    private void openCamera2() {
         Intent getPhoto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         strImgPath = Environment.getExternalStorageDirectory().toString() + "/image/";
         String fileName = "output_image.jpg";
@@ -132,19 +126,57 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         out = new File(strImgPath, fileName);
         strImgPath = strImgPath + fileName;
 
-        Uri uri = Uri.fromFile(out);
-        getPhoto.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+        mImageUri = Uri.fromFile(out);
+        getPhoto.putExtra(MediaStore.EXTRA_OUTPUT, mImageUri);
         getPhoto.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
         startActivityForResult(getPhoto, TAKE_PHOTO);
     }
+
+    /**
+     * Uri形式
+     */
+    private void openCamera() {
+        if (mOutputImage == null) {
+            mOutputImage = new File(getActivity().getExternalCacheDir(), "output_image.jpg");
+        }
+        try {
+            if (mOutputImage.exists()) {
+                mOutputImage.delete();
+            }
+            mOutputImage.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (Build.VERSION.SDK_INT >= 24) {
+            mImageUri = FileProvider.getUriForFile(getActivity(), "com.example.a6100890.gleaner.fileprovider", mOutputImage);
+        } else {
+            mImageUri = Uri.fromFile(mOutputImage);
+        }
+
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageUri);
+        startActivityForResult(intent, TAKE_PHOTO);
+    }
+
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
             case TAKE_PHOTO:
                 if (resultCode == getActivity().RESULT_OK) {
-                    mOutputImage = new File(strImgPath);
-                    recognizeImageFile(mOutputImage);
+//                    mOutputImage = new File(strImgPath);
+//                    recognizeImageFile(mOutputImage);
+
+                    try {
+                        Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(mImageUri));
+                        mOutputImage = Bitmap2File(bitmap, mOutputImage.getPath());
+                        Log.d(TAG, "onActivityResult: " + mOutputImage.length() + "  " + mOutputImage.getPath());
+                        recognizeImageFile(mOutputImage);
+
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
 
                 } else {
                     Log.d(TAG, "onActivityResult: result != OK");
@@ -268,6 +300,23 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         BASE64Encoder encoder = new BASE64Encoder();
         String result = encoder.encode(data);
         return result;
+    }
+
+    public static File Bitmap2File(Bitmap bitmap, String filePath) {
+        File file = new File(filePath);
+        try {
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
+            //压缩比例30
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 30, bos);
+            bos.flush();
+            bos.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return file;
     }
 
     /*
