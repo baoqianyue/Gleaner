@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Camera;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -26,6 +27,7 @@ import android.widget.TextView;
 
 import com.example.a6100890.gleaner.imageRecognition.ImageBody;
 import com.example.a6100890.gleaner.imageRecognition.Tags;
+import com.example.a6100890.gleaner.imageRecognition.takePhoto.CameraActivity;
 import com.google.gson.Gson;
 
 import java.io.BufferedReader;
@@ -105,38 +107,16 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         switch (view.getId()) {
             case R.id.btn_camara_release:
                 String filePath = "/storage/emulated/0/1/sina/nike.jpg";
-//                selectPicFromCamera();
-                openCamera();
+//                openCamera();
+
+                Intent intent = new Intent(getActivity(), CameraActivity.class);
+                startActivity(intent);
                 break;
 
             default:
                 break;
         }
 
-    }
-
-    private void selectPicFromCamera() {
-        try {
-            File outputImage = new File(Environment.getExternalStorageDirectory(), "output_image.jpg");
-
-            if (outputImage.exists()) {
-                outputImage.delete();
-            }
-            outputImage.createNewFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        //将File转换为Uri
-        if (Build.VERSION.SDK_INT >= 24) {
-            mImageUri = FileProvider.getUriForFile(getActivity(), "com.example.a6100890.gleaner.fileprovider", mOutputImage);
-        } else {
-            mImageUri = Uri.fromFile(mOutputImage);
-        }
-
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, mImageUri);
-        startActivityForResult(intent, TAKE_PHOTO);
     }
 
     private void openCamera() {
@@ -156,8 +136,6 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         getPhoto.putExtra(MediaStore.EXTRA_OUTPUT, uri);
         getPhoto.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1);
         startActivityForResult(getPhoto, TAKE_PHOTO);
-
-
     }
 
     @Override
@@ -166,7 +144,6 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             case TAKE_PHOTO:
                 if (resultCode == getActivity().RESULT_OK) {
                     mOutputImage = new File(strImgPath);
-//                    new UploadTask().execute(mOutputImage);
                     recognizeImageFile(mOutputImage);
 
                 } else {
