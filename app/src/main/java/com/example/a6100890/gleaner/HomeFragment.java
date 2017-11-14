@@ -11,11 +11,13 @@ import android.provider.MediaStore;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.FileProvider;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -25,12 +27,11 @@ import com.google.gson.Gson;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
@@ -67,6 +68,7 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     private String strImgPath;
     private ProgressBar mProgressBar;
     private TextView mTextView;
+    private ImageView mImageView;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -86,6 +88,7 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         mBtnCameraRelease.setOnClickListener(this);
         mProgressBar = view.findViewById(R.id.progress_bar);
         mTextView = view.findViewById(R.id.text_view);
+        mImageView = view.findViewById(R.id.picture);
     }
 
     public static HomeFragment newInstance() {
@@ -96,22 +99,43 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btn_camara_release:
-                String filePath = "/storage/emulated/0/1/sina/nike.jpg";
-//                openCamera();
-
                 openCamera();
-//                Intent intent = new Intent(getActivity(), CameraActivity.class);
-//                startActivity(intent);
                 break;
-
             default:
                 break;
         }
 
     }
 
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            case TAKE_PHOTO:
+                if (resultCode == getActivity().RESULT_OK) {
+                    try {
+                        mProgressBar.setVisibility(View.VISIBLE);
+                        mTextView.setText("正在识别...");
+
+                        Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(mImageUri));
+                        mImageView.setImageBitmap(bitmap);
+                        mOutputImage = Bitmap2File(bitmap, mOutputImage.getPath());
+                        Log.d(TAG, "onActivityResult: " + mOutputImage.length() + "  " + mOutputImage.getPath());
+                        recognizeImageFile(mOutputImage, bitmap);
+
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    Log.d(TAG, "onActivityResult: result != OK");
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
     /**
-     * 自己构建的File形式,暂时弃用
+     * 自己构建的返回File形式的拍照,暂时弃用
      */
     private void openCamera2() {
         Intent getPhoto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
@@ -159,59 +183,54 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         startActivityForResult(intent, TAKE_PHOTO);
     }
 
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        switch (requestCode) {
-            case TAKE_PHOTO:
-                if (resultCode == getActivity().RESULT_OK) {
-//                    mOutputImage = new File(strImgPath);
-//                    recognizeImageFile(mOutputImage);
-
-                    try {
-                        Bitmap bitmap = BitmapFactory.decodeStream(getContext().getContentResolver().openInputStream(mImageUri));
-                        mOutputImage = Bitmap2File(bitmap, mOutputImage.getPath());
-                        Log.d(TAG, "onActivityResult: " + mOutputImage.length() + "  " + mOutputImage.getPath());
-                        recognizeImageFile(mOutputImage);
-
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
-
-                } else {
-                    Log.d(TAG, "onActivityResult: result != OK");
-                }
-                break;
-            default:
-                break;
-        }
-    }
-
     /**
-     * 一定要开启一个线程来执行网络协议
+     * 识别所给的图像url
+     *
+     * @param imageUrl 通识物品的网络url
+     * @param bitmap   校园卡等特殊物品的bitmap
      */
-    private void recognitionImage(final String imageUrl) {
+    private void recognitizeImage(final String imageUrl, final Bitmap bitmap) {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 String postUrl = "https://dtplus-cn-shanghai.data.aliyuncs.com/image/tag";
                 String body = constructJson(imageUrl);
                 try {
-                    String result = sendPost(postUrl, body);
-                    Log.d(TAG, "recognitionImage: Thread: " + Thread.currentThread() + result);
+                    final String resultjson = sendPost(postUrl, body);
+                    Log.d(TAG, "recognitizeImage: Thread: " + Thread.currentThread() + resultjson);
+                    final String resultName = parseImageJson(resultjson);
+
+                    //更新UI
+                    getActivity().runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            SimpleDateFormat format = new SimpleDateFormat("yyyy年MM月dd日  HH:mm");
+                            String curTime = format.format(new Date(System.currentTimeMillis()));
+
+                            mProgressBar.setVisibility(View.GONE);
+                            mImageView.setImageBitmap(bitmap);
+                            mTextView.setText("识别结果为: " + resultName + "\n");
+                            mTextView.append("当前时间为: " + curTime + "\n");
+                            mTextView.append("地点为: "+ "中北大学主楼");
+
+                            if (resultName.contains("名片")) {
+                                mTextView.append("检测到校园卡,正在识别卡片信息...");
+                            }
+
+                        }
+                    });
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }).start();
+
     }
 
 
     /**
-     * 在sendRequest中调用
-     *
-     * @param imageUrl
-     * @return
+     * 把图像的url构造为jsonbody形式
      */
     private String constructJson(String imageUrl) {
         String json = "{\"type\":0,\"image_url\":" + "\"" + imageUrl + "\"" + "}";
@@ -222,26 +241,31 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
 
     /**
      * 结果保存在mImageTags中
+     * 代码需要重构一下,降低耦合性
      *
      * @param json
      */
-    private void paresJson(String json) {
+    private String parseImageJson(String json) {
         Gson gson = new Gson();
+        String result = "";
         if (json != null) {
             mImageTags = gson.fromJson(json, ImageBody.class).getTags();
 
-
             if (mImageTags.size() == 0) {
-                Log.d(TAG, "paresJson: something wrong: imageTags .size == 0");
+                Log.d(TAG, "parseImageJson: something wrong: imageTags .size == 0");
             } else {
                 for (Tags tag : mImageTags) {
-                    Log.d(TAG, "paresJson: " + tag.getValue() + " " + tag.getConfidence());
+                    Log.d(TAG, "parseImageJson: " + tag.getValue() + " " + tag.getConfidence());
                 }
+                result = mImageTags.get(0).getValue();
             }
         } else {
-            Log.d(TAG, "paresJson: json is null!");
+            Log.d(TAG, "parseImageJson: json is null!");
         }
+
+        return result;
     }
+
 
     public static String toGMTString(Date date) {
         SimpleDateFormat df = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss z", Locale.UK);
@@ -282,32 +306,15 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         return result;
     }
 
-    public static String File2String(File imageFile) {
-        InputStream in = null;
-        byte[] data = null;
-
-        //读取图片字节数组
-        try {
-            in = new FileInputStream(imageFile);
-            data = new byte[in.available()];
-            in.read(data);
-            in.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        BASE64Encoder encoder = new BASE64Encoder();
-        String result = encoder.encode(data);
-        return result;
-    }
-
+    /**
+     * 压缩Bitmap并转换为File
+     */
     public static File Bitmap2File(Bitmap bitmap, String filePath) {
         File file = new File(filePath);
         try {
             BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
             //压缩比例30
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 30, bos);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 50, bos);
             bos.flush();
             bos.close();
         } catch (FileNotFoundException e) {
@@ -317,6 +324,13 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         }
 
         return file;
+    }
+
+    public static String Bitmap2String(Bitmap bitmap) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 30, baos);
+        byte[] image = baos.toByteArray();
+        return Base64.encodeToString(image, Base64.DEFAULT);
     }
 
     /*
@@ -401,7 +415,14 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
         return result;
     }
 
-    private String recognizeImageFile(File file) {
+    /**
+     * 把File文件转换为网络url,然后识别
+     *
+     * @param bitmap 传入reconizeImage使用,用于检测到校园卡等物品的后续识别
+     * @param file   通识物品的File格式图片
+     * @return 识别结果String json
+     */
+    private String recognizeImageFile(File file, final Bitmap bitmap) {
         final BmobFile bmobFile = new BmobFile(file);
         final String[] imageUrl = new String[1];
 
@@ -411,7 +432,7 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
                 mProgressBar.setVisibility(View.GONE);
                 if (e == null) {
                     imageUrl[0] = bmobFile.getFileUrl();
-                    recognitionImage(imageUrl[0]);
+                    recognitizeImage(imageUrl[0], bitmap);
 
                 } else {
                     Log.d(TAG, "uploadFile failed: " + e.getMessage());
@@ -422,13 +443,39 @@ public class HomeFragment extends Fragment implements View.OnClickListener {
             @Override
             public void onProgress(Integer value) {
                 super.onProgress(value);
-                mProgressBar.setVisibility(View.VISIBLE);
-                mProgressBar.setProgress(value);
-                mTextView.setText("正在识别...");
             }
         });
 
         return imageUrl[0];
+    }
+
+    private void recognizeBusinessCard(Bitmap bitmap) {
+        final String url = "http(s)://dm-57.data.aliyun.com/rest/160601/ocr/ocr_business_card.json";
+        String base64Image = Bitmap2String(bitmap);
+        final String jsonBody = "{\n" + "  \"inputs\": [\n" +
+                "    {\n" +
+                "      \"image\": {\n" +
+                "        \"dataType\": 50,\n" +
+                "        \"dataValue\":" + base64Image +
+                "      }\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}";
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String resultJson = sendPost(url, jsonBody);
+                    Log.d(TAG, "recognize 名片: " + resultJson);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).run();
+
+
     }
 
 

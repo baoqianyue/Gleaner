@@ -9,23 +9,32 @@
         android:id="@+id/btn_camara_release"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="通过相机发布"/>
+        android:text="通识物品识别"/>
+
+    <ImageView
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:id="@+id/picture"
+        android:layout_below="@+id/btn_camara_release"
+        android:layout_centerHorizontal="true"/>
+
 
     <ProgressBar
         android:id="@+id/progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_below="@+id/btn_camara_release"
         android:layout_marginTop="49dp"
         android:visibility="gone"/>
+
     <TextView
+        android:textSize="@dimen/chat_nick_text_size"
         android:id="@+id/text_view"
         android:gravity="center_horizontal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/btn_camara_release"
+        android:layout_below="@+id/picture"
         android:layout_alignParentStart="true"/>
 
 
